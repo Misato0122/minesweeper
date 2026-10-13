@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>マインスイーパー</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="マイン">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#E3E9E3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+/* Artifact の外枠が担っていた基本設定とセーフエリア（ノッチ・ホームバー）の余白 */
+html { -webkit-text-size-adjust: 100%; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; touch-action: manipulation; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<style>
+/* Layout: 1 column field-survey sheet. Level switch, LCD status row, tile board, dig/flag mode bar. */
+:root {
+  --bg: #E3E9E3;
+  --frame: #CBD6CD;
+  --tile: #B3C5B7;
+  --tile-hi: #D2DFD5;
+  --tile-shadow: #8EA594;
+  --open: #F5F7F3;
+  --ink: #1D2924;
+  --muted: #55675C;
+  --accent: #C7461F;
+  --on-accent: #FFFFFF;
+  --good: #2A7653;
+  --lcd: #1B2420;
+  --lcd-fg: #FF9466;
+  --shadow: rgba(29, 41, 36, .18);
+  --n1: #2457B3; --n2: #2B7A39; --n3: #C0392B; --n4: #4B2E9A;
+  --n5: #8A4B12; --n6: #0F7C7B; --n7: #1D2924; --n8: #5E6F65;
+  --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121A16; --frame: #1B2620; --tile: #3A4D41; --tile-hi: #4B6155; --tile-shadow: #243029;
+    --open: #1A231E; --ink: #E7EFE9; --muted: #93A59A; --accent: #FF7A4D; --on-accent: #1A0F0A;
+    --good: #6FD3A0; --shadow: rgba(0, 0, 0, .5);
+    --n1: #7FA8FF; --n2: #6FD08A; --n3: #FF8A7A; --n4: #B9A0FF;
+    --n5: #E0A25E; --n6: #5ED3D0; --n7: #E7EFE9; --n8: #9AAAA0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121A16; --frame: #1B2620; --tile: #3A4D41; --tile-hi: #4B6155; --tile-shadow: #243029;
+  --open: #1A231E; --ink: #E7EFE9; --muted: #93A59A; --accent: #FF7A4D; --on-accent: #1A0F0A;
+  --good: #6FD3A0; --shadow: rgba(0, 0, 0, .5);
+  --n1: #7FA8FF; --n2: #6FD08A; --n3: #FF8A7A; --n4: #B9A0FF;
+  --n5: #E0A25E; --n6: #5ED3D0; --n7: #E7EFE9; --n8: #9AAAA0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font);
+  padding-inline: 16px; padding-block: 12px 20px;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.app { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
+.seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
+  background: var(--frame); border-radius: 14px; padding: 4px;
+}
+.seg button {
+  min-height: 44px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--muted); font-weight: 700; font-size: 15px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.seg button[aria-pressed="true"] { background: var(--open); color: var(--ink); box-shadow: 0 1px 3px var(--shadow); }
+.seg button .sub { font-size: 11px; font-weight: 700; color: var(--muted); }
+#levels button { flex-direction: column; gap: 1px; white-space: nowrap; font-size: 14px; line-height: 1.25; }
+.status { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
+.lcd {
+  display: inline-flex; align-items: center; gap: 8px; background: var(--lcd); color: var(--lcd-fg);
+  padding: 9px 12px; border-radius: 12px; min-width: 96px; justify-content: center;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 700; font-size: 24px; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: .06em;
+}
+.lcd svg { width: 18px; height: 18px; flex: none; }
+.lcd { justify-self: start; }
+.lcd.r { justify-self: end; }
+.reset {
+  min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; font-weight: 900; font-size: 15px;
+  background: var(--accent); color: var(--on-accent);
+}
+.reset:active { transform: scale(.97); }
+.stage { width: 100%; text-align: center; }
+.frame {
+  display: inline-block; background: var(--frame); padding: 6px; border-radius: 16px; vertical-align: top;
+}
+#board { display: grid; gap: 2px; touch-action: manipulation; }
+.cell {
+  width: var(--cs); height: var(--cs); border-radius: calc(var(--cs) * .16);
+  display: grid; place-items: center; font-weight: 900; font-size: calc(var(--cs) * .56); line-height: 1;
+  background: var(--tile);
+  box-shadow: inset 0 2px 0 var(--tile-hi), inset 0 -3px 0 var(--tile-shadow);
+  transition: background-color .08s;
+}
+.cell.h:active { background: var(--tile-hi); }
+.cell.open, .cell.m, .cell.x { background: var(--open); box-shadow: none; }
+.cell.b { background: var(--accent); box-shadow: none; }
+.cell .ic { width: 64%; height: 64%; display: block; }
+.n1 { color: var(--n1); } .n2 { color: var(--n2); } .n3 { color: var(--n3); } .n4 { color: var(--n4); }
+.n5 { color: var(--n5); } .n6 { color: var(--n6); } .n7 { color: var(--n7); } .n8 { color: var(--n8); }
+.msg { margin: 0; min-height: 22px; text-align: center; font-weight: 700; font-size: 15px; color: var(--muted); }
+.msg.win { color: var(--good); }
+.msg.lose { color: var(--accent); }
+.mode .ic { width: 18px; height: 18px; }
+.best { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.best li { background: var(--frame); border-radius: 12px; padding: 8px 6px; text-align: center; }
+.best .k { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
+.best .v { display: block; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.hint { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .cell { transition: none; } .reset:active { transform: none; } }
+</style>
+
+<main class="app">
+  <h1>マインスイーパー</h1>
+  <div class="seg" id="levels" role="group" aria-label="むずかしさ">
+    <button type="button" id="lv-easy" data-lv="easy" aria-pressed="true">かんたん <span class="sub">9×9</span></button>
+    <button type="button" id="lv-normal" data-lv="normal" aria-pressed="false">ふつう <span class="sub">9×14</span></button>
+    <button type="button" id="lv-hard" data-lv="hard" aria-pressed="false">むずかしい <span class="sub">12×18</span></button>
+  </div>
+  <div class="status">
+    <div class="lcd" aria-label="残りの地雷の数">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 3v14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3.2l9 3.9-9 3.9z" fill="currentColor"/><path d="M3.5 17.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span id="mines">010</span>
+    </div>
+    <button type="button" class="reset" id="reset">はじめから</button>
+    <div class="lcd r" aria-label="経過時間（秒）">
+      <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2"/></svg>
+      <span id="time">000</span>
+    </div>
+  </div>
+  <div class="stage" id="stage"><div class="frame"><div id="board" role="grid" aria-label="盤面"></div></div></div>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  <div class="seg mode" id="mode" role="group" aria-label="タップの動作">
+    <button type="button" id="m-dig" aria-pressed="true">
+      <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>ほる
+    </button>
+    <button type="button" id="m-flag" aria-pressed="false">
+      <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 3v14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3.2l9 3.9-9 3.9z" fill="currentColor"/><path d="M3.5 17.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>はた
+    </button>
+  </div>
+  <ul class="best" aria-label="ベストタイム">
+    <li><span class="k">かんたん</span><span class="v" id="best-easy">—</span></li>
+    <li><span class="k">ふつう</span><span class="v" id="best-normal">—</span></li>
+    <li><span class="k">むずかしい</span><span class="v" id="best-hard">—</span></li>
+  </ul>
+  <p class="hint">最初の1手は必ず安全です。旗は「はた」に切り替えるか、マスを長押しで立てられます。開いた数字をタップすると、旗の数が合うときに周りをまとめて開きます。</p>
+</main>
+
+<script>
+(function () {
+  var LEVELS = {
+    easy:   { c: 9,  r: 9,  m: 10 },
+    normal: { c: 9,  r: 14, m: 22 },
+    hard:   { c: 12, r: 18, m: 40 }
+  };
+  var FLAG = '<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 3v14.5" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3.2l9 3.9-9 3.9z" fill="var(--accent)"/><path d="M3.5 17.5h6" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg>';
+  var MINE = '<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v15M2.5 10h15M4.7 4.7l10.6 10.6M15.3 4.7L4.7 15.3" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="10" r="5.2" fill="var(--ink)"/><circle cx="8.2" cy="8.2" r="1.5" fill="var(--open)"/></svg>';
+  var WRONG = MINE.replace('</svg>', '<path d="M3 3l14 14M17 3L3 17" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>');
+
+  var $ = function (id) { return document.getElementById(id); };
+  var boardEl = $('board');
+  var lvKey = 'easy', L = LEVELS.easy;
+  var g = [], views = [], els = [];
+  var started = false, over = false, won = false, boom = -1;
+  var opened = 0, flags = 0, t0 = 0, timer = null, flagMode = false;
+  var best = { easy: null, normal: null, hard: null };
+
+  function load() {
+    try {
+      var b = JSON.parse(localStorage.getItem('ms-best') || 'null');
+      if (b) { for (var k in best) { if (typeof b[k] === 'number') best[k] = b[k]; } }
+      var lv = localStorage.getItem('ms-level');
+      if (lv && LEVELS[lv]) lvKey = lv;
+    } catch (e) {}
+  }
+  function save() {
+    try {
+      localStorage.setItem('ms-best', JSON.stringify(best));
+      localStorage.setItem('ms-level', lvKey);
+    } catch (e) {}
+  }
+  function fmt(n) {
+    if (n < 0) return '-' + String(Math.min(99, -n)).padStart(2, '0');
+    return String(Math.min(999, n)).padStart(3, '0');
+  }
+  function nb(i) {
+    var x = i % L.c, y = (i / L.c) | 0, a = [];
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        var nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < L.c && ny >= 0 && ny < L.r) a.push(ny * L.c + nx);
+      }
+    }
+    return a;
+  }
+  function setMsg(text, kind) {
+    var m = $('msg');
+    m.textContent = text;
+    m.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+  function renderBest() {
+    for (var k in LEVELS) { $('best-' + k).textContent = best[k] == null ? '—' : best[k] + '秒'; }
+  }
+  function size() {
+    var w = $('stage').clientWidth || 340;
+    var cs = Math.floor((w - 12 - (L.c - 1) * 2) / L.c);
+    cs = Math.max(20, Math.min(cs, 44));
+    boardEl.style.setProperty('--cs', cs + 'px');
+  }
+  function view(i) {
+    var c = g[i];
+    if (c.open) return c.n ? 'n' + c.n : 'o';
+    if (over && !won) {
+      if (c.mine && !c.flag) return i === boom ? 'b' : 'm';
+      if (!c.mine && c.flag) return 'x';
+    }
+    if (over && won && c.mine) return 'f';
+    return c.flag ? 'f' : 'h';
+  }
+  function paint(i, v) {
+    var el = els[i], cls = 'cell', html = '';
+    if (v === 'h') cls += ' h';
+    else if (v === 'f') { cls += ' f'; html = FLAG; }
+    else if (v === 'o') cls += ' open';
+    else if (v === 'm') { cls += ' m'; html = MINE; }
+    else if (v === 'b') { cls += ' b'; html = MINE; }
+    else if (v === 'x') { cls += ' x'; html = WRONG; }
+    else { cls += ' open ' + v; html = v.slice(1); }
+    el.className = cls;
+    el.innerHTML = html;
+  }
+  function render() {
+    for (var i = 0; i < g.length; i++) {
+      var v = view(i);
+      if (v !== views[i]) { views[i] = v; paint(i, v); }
+    }
+    $('mines').textContent = fmt(L.m - flags);
+  }
+  function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+  function elapsed() { return Math.floor((Date.now() - t0) / 1000); }
+  function tick() { $('time').textContent = fmt(elapsed()); }
+
+  function newGame() {
+    stopTimer();
+    L = LEVELS[lvKey];
+    g = []; views = []; els = [];
+    for (var i = 0; i < L.c * L.r; i++) g.push({ mine: false, open: false, flag: false, n: 0 });
+    started = over = won = false; boom = -1; opened = 0; flags = 0;
+    boardEl.innerHTML = '';
+    boardEl.style.gridTemplateColumns = 'repeat(' + L.c + ', var(--cs))';
+    size();
+    var frag = document.createDocumentFragment();
+    for (var j = 0; j < g.length; j++) {
+      var d = document.createElement('div');
+      d.dataset.i = j;
+      d.setAttribute('role', 'gridcell');
+      frag.appendChild(d);
+      els.push(d);
+      views.push('');
+    }
+    boardEl.appendChild(frag);
+    $('time').textContent = '000';
+    setMsg('マスをタップして始めましょう。', '');
+    render();
+  }
+
+  function place(safe) {
+    var ban = {};
+    ban[safe] = true;
+    nb(safe).forEach(function (j) { ban[j] = true; });
+    var pool = [];
+    for (var i = 0; i < g.length; i++) if (!ban[i]) pool.push(i);
+    for (var k = pool.length - 1; k > 0; k--) {
+      var r = Math.floor(Math.random() * (k + 1));
+      var t = pool[k]; pool[k] = pool[r]; pool[r] = t;
+    }
+    for (var m = 0; m < L.m; m++) g[pool[m]].mine = true;
+    for (var n = 0; n < g.length; n++) {
+      g[n].n = nb(n).filter(function (j) { return g[j].mine; }).length;
+    }
+  }
+  function start(i) {
+    started = true;
+    place(i);
+    t0 = Date.now();
+    timer = setInterval(tick, 250);
+    setMsg('', '');
+  }
+  function flood(i) {
+    var stack = [i];
+    while (stack.length) {
+      var k = stack.pop(), c = g[k];
+      if (c.open || c.flag) continue;
+      c.open = true; opened++;
+      if (c.n === 0) nb(k).forEach(function (j) { if (!g[j].open && !g[j].flag) stack.push(j); });
+    }
+  }
+  function lose(i) {
+    over = true; boom = i; stopTimer();
+    setMsg('地雷を踏みました。もういちど挑戦しましょう。', 'lose');
+    render();
+  }
+  function checkWin() {
+    if (opened !== g.length - L.m) return;
+    over = won = true; stopTimer();
+    flags = L.m;
+    var sec = Math.max(1, elapsed());
+    $('time').textContent = fmt(sec);
+    if (best[lvKey] == null || sec < best[lvKey]) {
+      best[lvKey] = sec; save(); renderBest();
+      setMsg('クリア！ ' + sec + '秒。ベスト更新です。', 'win');
+    } else {
+      setMsg('クリア！ ' + sec + '秒。', 'win');
+    }
+    render();
+  }
+  function dig(i) {
+    var c = g[i];
+    if (c.open || c.flag) return;
+    if (!started) start(i);
+    if (c.mine) { lose(i); return; }
+    flood(i);
+    checkWin();
+    render();
+  }
+  function chord(i) {
+    var c = g[i];
+    if (!c.open || !c.n) return;
+    var around = nb(i);
+    var f = around.filter(function (j) { return g[j].flag; }).length;
+    if (f !== c.n) return;
+    for (var k = 0; k < around.length; k++) {
+      var j = around[k];
+      if (g[j].open || g[j].flag) continue;
+      if (g[j].mine) { lose(j); return; }
+      flood(j);
+    }
+    checkWin();
+    render();
+  }
+  function toggleFlag(i) {
+    var c = g[i];
+    if (over || c.open) return;
+    c.flag = !c.flag;
+    flags += c.flag ? 1 : -1;
+    render();
+  }
+  function tap(i) {
+    if (over) return;
+    var c = g[i];
+    if (c.open) { chord(i); return; }
+    if (flagMode) { toggleFlag(i); return; }
+    if (c.flag) return;
+    dig(i);
+  }
+
+  var press = null;
+  function cancelPress() { if (press) { clearTimeout(press.tm); press = null; } }
+  boardEl.addEventListener('pointerdown', function (e) {
+    var el = e.target.closest('.cell');
+    if (!el) return;
+    var i = +el.dataset.i;
+    if (e.button === 2) { toggleFlag(i); return; }
+    cancelPress();
+    var p = { i: i, long: false, x: e.clientX, y: e.clientY };
+    p.tm = setTimeout(function () {
+      if (press === p && !over && !g[i].open) {
+        p.long = true;
+        toggleFlag(i);
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
+      }
+    }, 380);
+    press = p;
+  });
+  boardEl.addEventListener('pointermove', function (e) {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) cancelPress();
+  });
+  boardEl.addEventListener('pointerup', function (e) {
+    if (!press) return;
+    var p = press;
+    clearTimeout(p.tm); press = null;
+    if (p.long) return;
+    var el = e.target.closest('.cell');
+    if (el && +el.dataset.i === p.i) tap(p.i);
+  });
+  boardEl.addEventListener('pointercancel', cancelPress);
+  boardEl.addEventListener('pointerleave', cancelPress);
+  boardEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  $('reset').addEventListener('click', newGame);
+  $('levels').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-lv]');
+    if (!b) return;
+    setLevel(b.dataset.lv);
+  });
+  function setLevel(k) {
+    lvKey = k; save();
+    for (var key in LEVELS) $('lv-' + key).setAttribute('aria-pressed', key === k ? 'true' : 'false');
+    newGame();
+  }
+  function setMode(flag) {
+    flagMode = flag;
+    $('m-dig').setAttribute('aria-pressed', flag ? 'false' : 'true');
+    $('m-flag').setAttribute('aria-pressed', flag ? 'true' : 'false');
+  }
+  $('m-dig').addEventListener('click', function () { setMode(false); });
+  $('m-flag').addEventListener('click', function () { setMode(true); });
+  window.addEventListener('resize', size);
+
+  load();
+  renderBest();
+  setLevel(lvKey);
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

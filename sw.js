@@ -1,5 +1,5 @@
 // アプリ一式を端末に保存し、オフラインでも起動できるようにする
-const CACHE = 'app-20261013-095247';
+const CACHE = 'app-20261013-095441';
 const FILES = ["./", "index.html", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"];
 
 self.addEventListener('install', e => {

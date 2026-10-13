@@ -177,7 +177,7 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
     <li><span class="k">ふつう</span><span class="v" id="best-normal">—</span></li>
     <li><span class="k">むずかしい</span><span class="v" id="best-hard">—</span></li>
   </ul>
-  <p class="hint">最初の1手は必ず安全です。旗は「はた」に切り替えて立てます。長押しで立てたいときは、上のスイッチをオンにしてください。開いた数字をタップすると、旗の数が合うときに周りをまとめて開きます。</p>
+  <p class="hint">最初の1手は必ず安全です。旗は「はた」に切り替えるか、マスの長押しで立てられます。長押しが合わないときは、上のスイッチをオフにしてください。開いた数字をタップすると、旗の数が合うときに周りをまとめて開きます。</p>
 </main>
 
 <script>
@@ -196,7 +196,7 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
   var lvKey = 'easy', L = LEVELS.easy;
   var g = [], views = [], els = [];
   var started = false, over = false, won = false, boom = -1;
-  var opened = 0, flags = 0, t0 = 0, timer = null, flagMode = false, longPress = false;
+  var opened = 0, flags = 0, t0 = 0, timer = null, flagMode = false, longPress = true;
   var best = { easy: null, normal: null, hard: null };
 
   function load() {
@@ -205,14 +205,15 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
       if (b) { for (var k in best) { if (typeof b[k] === 'number') best[k] = b[k]; } }
       var lv = localStorage.getItem('ms-level');
       if (lv && LEVELS[lv]) lvKey = lv;
-      longPress = localStorage.getItem('ms-lp') === '1';
+      var lp = localStorage.getItem('ms-lp2');
+      longPress = lp === null ? true : lp === '1';
     } catch (e) {}
   }
   function save() {
     try {
       localStorage.setItem('ms-best', JSON.stringify(best));
       localStorage.setItem('ms-level', lvKey);
-      localStorage.setItem('ms-lp', longPress ? '1' : '0');
+      localStorage.setItem('ms-lp2', longPress ? '1' : '0');
     } catch (e) {}
   }
   function fmt(n) {

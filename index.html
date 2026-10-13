@@ -120,6 +120,18 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
 .msg.win { color: var(--good); }
 .msg.lose { color: var(--accent); }
 .mode .ic { width: 18px; height: 18px; }
+.opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 48px; padding: 0 8px 0 14px; background: var(--frame); border-radius: 14px;
+  font-size: 14px; font-weight: 700;
+}
+.sw { width: 52px; height: 32px; border: 0; border-radius: 16px; background: var(--muted); position: relative; padding: 0; flex: none; }
+.sw::after {
+  content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--open); transition: transform .15s;
+}
+.sw[aria-checked="true"] { background: var(--good); }
+.sw[aria-checked="true"]::after { transform: translateX(20px); }
 .best { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .best li { background: var(--frame); border-radius: 12px; padding: 8px 6px; text-align: center; }
 .best .k { display: block; font-size: 11px; font-weight: 700; color: var(--muted); }
@@ -156,12 +168,16 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
       <svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 3v14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.5 3.2l9 3.9-9 3.9z" fill="currentColor"/><path d="M3.5 17.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>はた
     </button>
   </div>
+  <div class="opt">
+    <span id="lp-label">長押しで旗を立てる</span>
+    <button type="button" class="sw" id="lp" role="switch" aria-checked="false" aria-labelledby="lp-label"></button>
+  </div>
   <ul class="best" aria-label="ベストタイム">
     <li><span class="k">かんたん</span><span class="v" id="best-easy">—</span></li>
     <li><span class="k">ふつう</span><span class="v" id="best-normal">—</span></li>
     <li><span class="k">むずかしい</span><span class="v" id="best-hard">—</span></li>
   </ul>
-  <p class="hint">最初の1手は必ず安全です。旗は「はた」に切り替えるか、マスを長押しで立てられます。開いた数字をタップすると、旗の数が合うときに周りをまとめて開きます。</p>
+  <p class="hint">最初の1手は必ず安全です。旗は「はた」に切り替えて立てます。長押しで立てたいときは、上のスイッチをオンにしてください。開いた数字をタップすると、旗の数が合うときに周りをまとめて開きます。</p>
 </main>
 
 <script>
@@ -180,7 +196,7 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
   var lvKey = 'easy', L = LEVELS.easy;
   var g = [], views = [], els = [];
   var started = false, over = false, won = false, boom = -1;
-  var opened = 0, flags = 0, t0 = 0, timer = null, flagMode = false;
+  var opened = 0, flags = 0, t0 = 0, timer = null, flagMode = false, longPress = false;
   var best = { easy: null, normal: null, hard: null };
 
   function load() {
@@ -189,12 +205,14 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
       if (b) { for (var k in best) { if (typeof b[k] === 'number') best[k] = b[k]; } }
       var lv = localStorage.getItem('ms-level');
       if (lv && LEVELS[lv]) lvKey = lv;
+      longPress = localStorage.getItem('ms-lp') === '1';
     } catch (e) {}
   }
   function save() {
     try {
       localStorage.setItem('ms-best', JSON.stringify(best));
       localStorage.setItem('ms-level', lvKey);
+      localStorage.setItem('ms-lp', longPress ? '1' : '0');
     } catch (e) {}
   }
   function fmt(n) {
@@ -383,12 +401,12 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
     cancelPress();
     var p = { i: i, long: false, x: e.clientX, y: e.clientY };
     p.tm = setTimeout(function () {
-      if (press === p && !over && !g[i].open) {
+      if (longPress && press === p && !over && !g[i].open) {
         p.long = true;
         toggleFlag(i);
         try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
       }
-    }, 380);
+    }, 550);
     press = p;
   });
   boardEl.addEventListener('pointermove', function (e) {
@@ -424,10 +442,17 @@ h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: .04em; }
   }
   $('m-dig').addEventListener('click', function () { setMode(false); });
   $('m-flag').addEventListener('click', function () { setMode(true); });
+  function setLp(on, skipSave) {
+    longPress = on;
+    $('lp').setAttribute('aria-checked', on ? 'true' : 'false');
+    if (!skipSave) save();
+  }
+  $('lp').addEventListener('click', function () { setLp(!longPress); });
   window.addEventListener('resize', size);
 
   load();
   renderBest();
+  setLp(longPress, true);
   setLevel(lvKey);
 })();
 </script>
